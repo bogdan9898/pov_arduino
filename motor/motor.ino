@@ -7,7 +7,7 @@
 #define gnd 12
 #define vcc 11
 
-#define maxSpeed 115//185//68//115
+#define maxSpeed 135//185//68//115
 
 bool dir = true;
 int prevButtonVal;

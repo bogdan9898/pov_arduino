@@ -10,23 +10,26 @@ Timer t;
 #define NUMPIXELS 24
 #define COLOR_SPACE 3
 
+//#include "font.h"
+
 //#define DEBUG
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, DATA_PIN, NEO_GRB + NEO_KHZ800);
 
-#define NUM_COLORS 6
+#define NUM_COLORS 7
 const byte colors[NUM_COLORS+1][3] = {255, 0, 255,
                                                                       0, 255, 255,
                                                                       255, 255, 0,
                                                                       0, 255, 0,
                                                                       255, 0, 0,
                                                                       0, 0, 255,
+                                                                      255, 132, 0,
                                                                       0, 0, 0
                                                                       };
 
 #define OFF NUM_COLORS
 
-const unsigned int segments = 32;
+const unsigned int segments = 64;
 byte image[segments][NUMPIXELS] = {0};
 
 unsigned int currentSegment = 0;
@@ -54,7 +57,7 @@ void setup() {
   randomSeed(analogRead(0));
   
   pixels.begin();
-  pixels.setBrightness(25);
+  pixels.setBrightness(100);
 
   // random colors
   int prev_color_index = -1;
@@ -73,22 +76,6 @@ void setup() {
 }
 
 void loop() {
-//  for(int i=0; i < NUMPIXELS; i++){
-//    pixels.setPixelColor(i, pixels.Color(image[(i + offset) % NUMPIXELS][0], image[(i + offset) % NUMPIXELS][1], image[(i + offset) % NUMPIXELS][2])); 
-//  }
-//  pixels.show();
-//  if(micros() - prevTime >= interval) {
-//    offset++;
-//    prevTime = micros();
-////    Serial.println(prevTime);
-//  }
-
-//    static const unsigned int imageInterval = interval * segments;
-//    if(millis() - prevTime > imageInterval) {
-//      prevTime = millis();
-//      drawImage();
-//  anim1();
-
   int val = analogRead(A0);
 //#ifdef DEBUG
 //  Serial.println(val);
@@ -100,23 +87,63 @@ void loop() {
     if(changeColor) {
       changeColor = false;
 //      t = random(NUM_COLORS);
-      segmentInterval = (millis() - fullRotationStartTime) / segments;
-      fullRotationStartTime = millis();
-      currentSegment = 0;
-      if(timerId >= 0) {
-        t.stop(timerId);        
-      }
-      timerId = t.every(segmentInterval, drawSegment, -1);
+//      unsigned long newSegmentInterval = (millis() - fullRotationStartTime) / segments;
+//      if(not (millis() >= 10000 and newSegmentInterval < segmentInterval + 5)) {
+      // todo: average for segmentInterval;
+        segmentInterval = (millis() - fullRotationStartTime) / segments;
+        fullRotationStartTime = millis();
+        currentSegment = 0;
+        if(timerId >= 0) {
+          t.stop(timerId);        
+        }
+        timerId = t.every(segmentInterval, drawSegment, -1);
+//      }
     }
   } else {
     changeColor = true;
   }
 
-  static bool animRunning = false;
-  if(millis() > 5000 and not animRunning) {
-    animRunning = true;
+//  static bool animRunning = false;
+//  if(millis() - prevTime > 5000 and not animRunning) { // todo: switch between animtions
+//    animRunning = true;
 //    anim1();
-    anim2();
+////    anim2();
+////    anim3();
+////    anim4();
+//  }
+
+
+  static unsigned long prevTime = 0;
+  static bool animationRunning = false;
+  static byte anim_index = 0;
+  if(animationRunning) {
+    if(millis() - prevTime > 30000) {
+      prevTime = millis();
+      switch (anim_index) {
+      case 0:
+        anim1();
+        break;
+      case 1:
+        anim2();
+        break;
+      case 2:
+         anim3();
+         break;
+      case 3:
+          anim4();
+          break;
+      }
+      anim_index = (anim_index + 1) % 4;
+    }
+  } else {
+    if(millis() - prevTime > 5000) {
+      prevTime = millis();
+      animationRunning = true;
+      anim1();
+//      anim2();
+//      anim3();
+//      anim4();
+    }
   }
 
   t.update();
@@ -149,7 +176,10 @@ void anim1() { // spinning circles
     }
   }
 
-  animationTimer = t.every(100, anim1Update, -1);
+  if(animationTimer >= 0) {
+    t.stop(animationTimer);
+  }
+  animationTimer = t.every(300, anim1Update, -1);
 }
 
 void anim1Update() {
@@ -248,8 +278,11 @@ void anim2() { // exploding circle
       }
     }
   }
-  
-  animationTimer = t.every(250, anim2Update, -1);
+
+  if(animationTimer >= 0) {
+    t.stop(animationTimer);
+  }
+  animationTimer = t.every(500, anim2Update, -1);
 }
 
 void anim2Update() {
@@ -320,25 +353,16 @@ void anim3() { // loading circle
       }
     }
   }
-  
-  animationTimer = t.every(250, anim3Update, -1);
-}
- void anim3Update() {
-  if(not isTurnedOn(0, 0)) { // if no led turned on
-    byte color_index = random(NUM_COLORS);
-    for(int i = 0; i < segments; i++) {
-      for(int j = 0; j < NUMPIXELS; j++) {
-        if(i == 0) {
-          image[i][j] = color_index;
-        } else {
-          image[i][j] = OFF;
-        }
-      }
-    }
-    return;
-  }
 
-  static bool dir = true;
+  if(animationTimer >= 0) {
+    t.stop(animationTimer);
+  }
+  animationTimer = t.every(300, anim3Update, -1);
+}
+
+ void anim3Update() {
+  static char gradient[] = {-1, 0, 1};
+  static bool dir = false;
   if(dir) {
     // search first on segment and turn all leds off
     for(int i = 0; i < segments; i++) {
@@ -356,8 +380,24 @@ void anim3() { // loading circle
     // search first off segment and turn all leds on
     for(int i = 0; i < segments; i++) {
       if(not isTurnedOn(i, 0)) {
+        if(i == 0) { // no led is on
+          dir = false;
+#ifdef DEBUG  
+          Serial.println("new loop");
+#endif      
+          byte color_index = random(NUM_COLORS);
+          for(int i = 0; i < segments; i++) {
+            for(int j = 0; j < NUMPIXELS; j++) {
+              if(i == 0) {
+                image[i][j] = color_index;
+              } else {
+                image[i][j] = OFF;
+              }
+            }
+          }
+          return;
+        }
         for(int j = 0; j < NUMPIXELS; j++) {
-          // edge case for led (0, 0) OFF, is checked and fixed at the beginning
           image[i][j] = image[i-1][j];
         }
         if(i >= segments - 1) {
@@ -371,10 +411,58 @@ void anim3() { // loading circle
 }
 
 void anim4() { // spiral
-  
+  for(int i = 0; i < segments; i++) {
+    for(int j = 0; j < NUMPIXELS; j++) {
+      image[i][j] = OFF;
+    }
+  }
+  image[0][NUMPIXELS - 1] = random(NUM_COLORS);
+
+  if(animationTimer >= 0) {
+    t.stop(animationTimer);
+  }
+  animationTimer = t.every(100, anim4Update, -1);
 }
 
 void anim4Update() {
+  static bool dir = true;  
+  if(dir) { // find first turned off pixel and turn it on
+    for(int j = NUMPIXELS - 1; j >= 0; j--) {
+      for(int i = 0; i < segments; i++) {
+        if(not isTurnedOn(i, j)) {
+          if(i <= 0) {
+            image[i][j] = random(NUM_COLORS);
+          } else {
+            image[i][j] = image[0][j];          
+          }
+          return;
+        }
+        if(i >= segments - 1 and j <= 0) {
+          dir = not dir;
+        }
+      }
+    }
+  } else { // find first turned on pixel and turn it off
+    for(int j = 0; j < NUMPIXELS; j++) {
+      for(int i = segments-1; i >= 0; i--) {
+        if(isTurnedOn(i, j)) {
+          image[i][j] = OFF;
+          return;
+        }
+        if(i <= 0 and j >= NUMPIXELS - 1) {
+          dir = not dir;
+          image[0][NUMPIXELS-1] = random(NUM_COLORS);
+        }
+      }
+    }
+  }
+}
+
+void anim5() { // RPM
+  
+}
+
+void anim6() { // display strings with our names
   
 }
 
